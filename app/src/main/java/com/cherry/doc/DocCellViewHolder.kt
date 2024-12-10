@@ -3,13 +3,15 @@ package com.cherry.doc
 import android.view.View
 import android.view.View.OnClickListener
 import android.widget.AdapterView.OnItemClickListener
+import android.widget.ImageView
+import android.widget.TextView
+import androidx.cardview.widget.CardView
 import androidx.core.content.res.ResourcesCompat
 import androidx.recyclerview.widget.RecyclerView
 import coil.load
 import com.cherry.doc.data.DocInfo
 import com.cherry.lib.doc.bean.FileType
 import com.cherry.lib.doc.util.FileUtils
-import kotlinx.android.synthetic.main.rv_doc_item_cell.view.*
 import java.io.File
 
 /*
@@ -23,73 +25,81 @@ import java.io.File
  * -----------------------------------------------------------------
  */
 
-class DocCellViewHolder : RecyclerView.ViewHolder,OnClickListener {
+class DocCellViewHolder(itemView: View, groupPosition: Int) : RecyclerView.ViewHolder(itemView),OnClickListener {
     var mOnItemClickListener: OnItemClickListener? = null
-    var parentPosition: Int = 0
-    constructor(itemView: View, groupPosition: Int) : super(itemView) {
-        parentPosition = groupPosition
+    var parentPosition: Int = groupPosition
+    private var mCvDocCell:CardView
+    private var mIvType:ImageView
+    private var mTvFileName:TextView
+    private var mTvFileDes:TextView
+
+    init {
         itemView.setOnClickListener(this)
+        mCvDocCell = itemView.findViewById(R.id.mCvDocCell)
+        mIvType = itemView.findViewById(R.id.mIvType)
+        mTvFileName = itemView.findViewById(R.id.mTvFileName)
+        mTvFileDes = itemView.findViewById(R.id.mTvFileDes)
     }
 
     fun bindData(data: DocInfo?) {
-        var typeIcon = data?.getTypeIcon() ?: -1
+        val typeIcon = data?.getTypeIcon() ?: -1
         if (typeIcon == -1) {
-            var file = File(data?.path)
+            val file = File(data?.path)
             if (file.exists()) {
-                itemView.mIvType.load(File(data?.path))
+                mIvType.load(File(data?.path))
             } else {
-                itemView.mIvType.load(com.cherry.lib.doc.R.drawable.all_doc_ic)
+                mIvType.load(com.cherry.lib.doc.R.drawable.all_doc_ic)
             }
         } else {
-            itemView.mIvType.load(typeIcon)
+            mIvType.load(typeIcon)
         }
-        itemView.mTvFileName.text = data?.fileName
-        itemView.mTvFileDes.text = "${data?.getFileType()} | ${data?.fileSize}\n${data?.lastModified}"
+        mTvFileName.text = data?.fileName
+        mTvFileDes.text = "${data?.getFileType()} | ${data?.fileSize}\n${data?.lastModified}"
 
         val type = FileUtils.getFileTypeForUrl(data?.path)
         when (type) {
             FileType.PDF -> {
-                itemView.mCvDocCell.setCardBackgroundColor(
+                mCvDocCell.setCardBackgroundColor(
                     ResourcesCompat.getColor(
-                        itemView.mCvDocCell.resources,
+                        mCvDocCell.resources,
                         R.color.listItemColorPdf,
-                        itemView.mCvDocCell.context.theme
+                        mCvDocCell.context.theme
                     )
                 )
             }
             FileType.DOC,FileType.DOCX -> {
-                itemView.mCvDocCell.setCardBackgroundColor(
+                mCvDocCell.setCardBackgroundColor(
                     ResourcesCompat.getColor(
-                        itemView.mCvDocCell.resources,
+                        mCvDocCell.resources,
                         R.color.listItemColorDoc,
-                        itemView.mCvDocCell.context.theme
+                        mCvDocCell.context.theme
                     )
                 )
             }
             FileType.XLS,FileType.XLSX -> {
-                itemView.mCvDocCell.setCardBackgroundColor(
+                mCvDocCell.setCardBackgroundColor(
                     ResourcesCompat.getColor(
-                        itemView.mCvDocCell.resources,
+                        mCvDocCell.resources,
                         R.color.listItemColorExcel,
-                        itemView.mCvDocCell.context.theme
+                        mCvDocCell.context.theme
                     )
                 )
             }
             FileType.PPT,FileType.PPTX -> {
-                itemView.mCvDocCell.setCardBackgroundColor(
+                mCvDocCell.setCardBackgroundColor(
                     ResourcesCompat.getColor(
-                        itemView.mCvDocCell.resources,
+                        mCvDocCell.resources,
                         R.color.listItemColorPPT,
-                        itemView.mCvDocCell.context.theme
+                        mCvDocCell.context.theme
                     )
                 )
             }
             FileType.IMAGE -> {
-                itemView.mCvDocCell.setCardBackgroundColor(
+                mCvDocCell.setCardBackgroundColor(
                     ResourcesCompat.getColor(
-                        itemView.mCvDocCell.resources,
+                        mCvDocCell.resources,
                         R.color.listItemColorImage,
-                        itemView.mCvDocCell.context.theme
+                        mCvDocCell.context.theme
                     )
                 )
             }

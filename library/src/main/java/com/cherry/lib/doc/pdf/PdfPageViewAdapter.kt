@@ -7,14 +7,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AlphaAnimation
 import android.view.animation.LinearInterpolator
-import android.widget.Toast
-import androidx.core.view.updateLayoutParams
+import android.widget.ImageView
+import android.widget.ProgressBar
 import androidx.recyclerview.widget.RecyclerView
 import com.cherry.lib.doc.R
 import com.cherry.lib.doc.util.ViewUtils.hide
 import com.cherry.lib.doc.util.ViewUtils.show
-import kotlinx.android.synthetic.main.page_item_pdf.view.*
-import kotlinx.android.synthetic.main.pdf_view_page_loading_layout.view.*
 
 /*
  * -----------------------------------------------------------------
@@ -36,8 +34,10 @@ internal class PdfPageViewAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): PdfPageViewHolder {
         return PdfPageViewHolder(
-            LayoutInflater.from(parent.context).inflate(R.layout.page_item_pdf,parent,
-                false)
+            LayoutInflater.from(parent.context).inflate(
+                R.layout.page_item_pdf, parent,
+                false
+            )
         )
     }
 
@@ -49,26 +49,33 @@ internal class PdfPageViewAdapter(
         holder.bindView()
     }
 
-    inner class PdfPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView),View.OnAttachStateChangeListener {
+    inner class PdfPageViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView),
+        View.OnAttachStateChangeListener {
 
         fun bindView() {
         }
 
+        private var pdf_view_page_loading_progress: ProgressBar
+        private var pageView: ImageView
+
+        init {
+            pdf_view_page_loading_progress =
+                itemView.findViewById(R.id.pdf_view_page_loading_progress)
+            pageView = itemView.findViewById(R.id.pageView)
+            itemView.addOnAttachStateChangeListener(this)
+        }
+
         private fun handleLoadingForPage(position: Int) {
             if (!enableLoadingForPages) {
-                itemView.pdf_view_page_loading_progress.hide()
+                pdf_view_page_loading_progress.hide()
                 return
             }
 
             if (renderer?.pageExistInCache(position) == true) {
-                itemView.pdf_view_page_loading_progress.hide()
+                pdf_view_page_loading_progress.hide()
             } else {
-                itemView.pdf_view_page_loading_progress.show()
+                pdf_view_page_loading_progress.show()
             }
-        }
-
-        init {
-            itemView.addOnAttachStateChangeListener(this)
         }
 
         override fun onViewAttachedToWindow(p0: View) {
@@ -84,20 +91,20 @@ internal class PdfPageViewAdapter(
 //                            this.rightMargin = pageSpacing.right
 //                            this.bottomMargin = pageSpacing.bottom
 //                        }
-                        itemView.pageView.setImageBitmap(bitmap)
-                        itemView.pageView.animation = AlphaAnimation(0F, 1F).apply {
+                        pageView.setImageBitmap(bitmap)
+                        pageView.animation = AlphaAnimation(0F, 1F).apply {
                             interpolator = LinearInterpolator()
                             duration = 200
                         }
-                        itemView.pdf_view_page_loading_progress.hide()
+                        pdf_view_page_loading_progress.hide()
                     }
                 }
             }
         }
 
         override fun onViewDetachedFromWindow(p0: View) {
-            itemView.pageView.setImageBitmap(null)
-            itemView.pageView.clearAnimation()
+            pageView.setImageBitmap(null)
+            pageView.clearAnimation()
         }
     }
 }

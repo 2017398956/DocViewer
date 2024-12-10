@@ -14,7 +14,6 @@ import android.webkit.*
 import androidx.constraintlayout.widget.ConstraintLayout
 import com.cherry.lib.doc.R
 import com.cherry.lib.doc.interfaces.OnWebLoadListener
-import kotlinx.android.synthetic.main.doc_web_view.view.*
 
 /*
  * -----------------------------------------------------------------
@@ -39,9 +38,10 @@ class DocWebView : ConstraintLayout, DownloadListener {
     constructor(context: Context, attrs: AttributeSet?, defStyle: Int) : super(context, attrs, defStyle) {
         initView()
     }
-
+    private lateinit var mDocView : WebView
     fun initView() {
-        LayoutInflater.from(context).inflate(R.layout.doc_web_view, this, true)
+        val tempView = LayoutInflater.from(context).inflate(R.layout.doc_web_view, this, true)
+        mDocView = tempView.findViewById(R.id.mWebView)
         mDocView.webChromeClient = DocWebChromeClient()
         mDocView.webViewClient = DocWebViewClient()
         //设置可以支持缩放

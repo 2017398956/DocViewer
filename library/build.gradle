@@ -1,7 +1,6 @@
 plugins {
     id 'com.android.library'
     id 'org.jetbrains.kotlin.android'
-    id 'kotlin-android-extensions'
     id 'maven-publish'
 }
 
@@ -61,6 +60,17 @@ dependencies {
 
 }
 
+def pubLocal() {
+    def repoDir = file("../repo/com/github/Victor2018")
+    if (!repoDir.exists()) {
+        String[] temp = ["./gradlew.bat", ":library:publish"]
+        Runtime.runtime.exec(temp, null, file("../."))
+        println("create DocViewer succes.")
+    } else {
+        println("has created DocViewer")
+    }
+}
+
 afterEvaluate {
     publishing {
         publications {
@@ -71,5 +81,14 @@ afterEvaluate {
                 version = '1.0.0'
             }
         }
+
+        repositories {
+            maven {
+                name = 'DocViewer'
+                // url = layout.buildDirectory.dir("repo")
+                url = "../repo"
+            }
+        }
     }
+    pubLocal()
 }

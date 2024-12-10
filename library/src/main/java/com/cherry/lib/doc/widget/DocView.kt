@@ -8,15 +8,15 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Rect
 import android.graphics.drawable.Drawable
-import android.net.Uri
 import android.os.Build
 import android.util.AttributeSet
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
-import android.webkit.MimeTypeMap
 import android.widget.FrameLayout
+import android.widget.ProgressBar
 import android.widget.RelativeLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.net.toUri
@@ -34,8 +34,8 @@ import com.cherry.lib.doc.bean.DocEngine
 import com.cherry.lib.doc.bean.DocMovingOrientation
 import com.cherry.lib.doc.bean.DocSourceType
 import com.cherry.lib.doc.bean.FileType
-import com.cherry.lib.doc.interfaces.OnDownloadListener
 import com.cherry.lib.doc.interfaces.OnDocPageChangeListener
+import com.cherry.lib.doc.interfaces.OnDownloadListener
 import com.cherry.lib.doc.interfaces.OnPdfItemClickListener
 import com.cherry.lib.doc.interfaces.OnWebLoadListener
 import com.cherry.lib.doc.office.IOffice
@@ -44,11 +44,11 @@ import com.cherry.lib.doc.pdf.PdfPageViewAdapter
 import com.cherry.lib.doc.pdf.PdfQuality
 import com.cherry.lib.doc.pdf.PdfRendererCore
 import com.cherry.lib.doc.pdf.PdfViewAdapter
+import com.cherry.lib.doc.pdf.PinchZoomRecyclerView
 import com.cherry.lib.doc.util.Constant
 import com.cherry.lib.doc.util.FileUtils
 import com.cherry.lib.doc.util.ViewUtils.hide
 import com.cherry.lib.doc.util.ViewUtils.show
-import kotlinx.android.synthetic.main.doc_view.view.*
 import java.io.File
 import java.net.URLEncoder
 
@@ -63,13 +63,13 @@ import java.net.URLEncoder
  * -----------------------------------------------------------------
  */
 
-class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClickListener {
+class DocView : FrameLayout, OnDownloadListener, OnWebLoadListener, OnPdfItemClickListener {
 
     private val TAG = "DocView"
 
     var mActivity: Activity? = null
     var lifecycleScope: LifecycleCoroutineScope = (context as AppCompatActivity).lifecycleScope
-    private var mPoiViewer:PoiViewer? = null
+    private var mPoiViewer: PoiViewer? = null
     private var pdfRendererCore: PdfRendererCore? = null
     private var pdfViewAdapter: PdfViewAdapter? = null
     private var pdfPageViewAdapter: PdfPageViewAdapter? = null
@@ -87,7 +87,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
     var pbColor: Int = pbDefaultColor
 
     private var pdfRendererCoreInitialised = false
-    var pageMargin: Rect = Rect(0,0,0,0)
+    var pageMargin: Rect = Rect(0, 0, 0, 0)
 
     var totalPageCount = 0
 
@@ -98,12 +98,35 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
 
     constructor(context: Context) : this(context, null)
     constructor(context: Context, attrs: AttributeSet?) : this(context, attrs, 0)
-    constructor(context: Context, attrs: AttributeSet?, defStyle: Int) : super(context, attrs, defStyle) {
+    constructor(context: Context, attrs: AttributeSet?, defStyle: Int) : super(
+        context,
+        attrs,
+        defStyle
+    ) {
         initView(attrs, defStyle)
     }
 
-    fun initView(attrs: AttributeSet?, defStyle: Int) {
-        inflate(context, R.layout.doc_view, this)
+    private lateinit var mIvPdf: PinchImageView
+    private lateinit var mLlBigPdfImage: FrameLayout
+    private lateinit var mPlLoadProgress: ProgressBar
+    private lateinit var mPdfPageNo: TextView
+    private lateinit var mDocWeb: DocWebView
+    private lateinit var mFlDocContainer: FrameLayout
+    private lateinit var mRvPdf: PinchZoomRecyclerView
+    private lateinit var mIvImage: PinchImageView
+    private lateinit var mPbBigLoading: ProgressBar
+
+    private fun initView(attrs: AttributeSet?, defStyle: Int) {
+        val tempView = inflate(context, R.layout.doc_view, this)
+        mIvPdf = tempView.findViewById(R.id.mIvPdf)
+        mLlBigPdfImage = tempView.findViewById(R.id.mLlBigPdfImage)
+        mPlLoadProgress = tempView.findViewById(R.id.mPlLoadProgress)
+        mPdfPageNo = tempView.findViewById(R.id.mPdfPageNo)
+        mDocWeb = tempView.findViewById(R.id.mDocWeb)
+        mFlDocContainer = tempView.findViewById(R.id.mFlDocContainer)
+        mRvPdf = tempView.findViewById(R.id.mRvPdf)
+        mIvImage = tempView.findViewById(R.id.mIvImage)
+        mPbBigLoading = tempView.findViewById(R.id.mPbBigLoading)
 
         mIvPdf.setOnClickListener {
             mLlBigPdfImage.hide()
@@ -112,7 +135,10 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         val typedArray =
             context.obtainStyledAttributes(attrs, R.styleable.DocView, defStyle, 0)
         val orientation =
-            typedArray.getInt(R.styleable.DocView_dv_moving_orientation, DocMovingOrientation.HORIZONTAL.orientation)
+            typedArray.getInt(
+                R.styleable.DocView_dv_moving_orientation,
+                DocMovingOrientation.HORIZONTAL.orientation
+            )
         mMovingOrientation = DocMovingOrientation.values().first { it.orientation == orientation }
         val ratio =
             typedArray.getInt(R.styleable.DocView_dv_quality, PdfQuality.NORMAL.ratio)
@@ -123,8 +149,12 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         showDivider = typedArray.getBoolean(R.styleable.DocView_dv_showDivider, true)
         showPageNum = typedArray.getBoolean(R.styleable.DocView_dv_show_page_num, true)
         divider = typedArray.getDrawable(R.styleable.DocView_dv_divider)
-        enableLoadingForPages = typedArray.getBoolean(R.styleable.DocView_dv_enableLoadingForPages, enableLoadingForPages)
-        pbHeight = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_pb_height, pbDefaultHeight)
+        enableLoadingForPages = typedArray.getBoolean(
+            R.styleable.DocView_dv_enableLoadingForPages,
+            enableLoadingForPages
+        )
+        pbHeight =
+            typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_pb_height, pbDefaultHeight)
         pbColor = typedArray.getColor(R.styleable.DocView_dv_page_pb_color, pbDefaultColor)
 
         val marginDim = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_margin, 0)
@@ -132,7 +162,8 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
             top = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_marginTop, top)
             left = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_marginLeft, left)
             right = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_marginRight, right)
-            bottom = typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_marginBottom, bottom)
+            bottom =
+                typedArray.getDimensionPixelSize(R.styleable.DocView_dv_page_marginBottom, bottom)
         }
 
         var layoutParams = mPlLoadProgress.layoutParams
@@ -150,16 +181,20 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
     }
 
 
-    fun openDoc(activity: Activity, docUrl: String?, docSourceType: Int,
-                engine: DocEngine = this.engine) {
+    fun openDoc(
+        activity: Activity, docUrl: String?, docSourceType: Int,
+        engine: DocEngine = this.engine
+    ) {
         mActivity = activity
-        openDoc(activity, docUrl, docSourceType,-1,false,engine)
+        openDoc(activity, docUrl, docSourceType, -1, false, engine)
     }
 
-    fun openDoc(activity: Activity?, docUrl: String?,
-                docSourceType: Int, fileType: Int,
-                viewPdfInPage: Boolean = false,
-                engine: DocEngine = this.engine) {
+    fun openDoc(
+        activity: Activity?, docUrl: String?,
+        docSourceType: Int, fileType: Int,
+        viewPdfInPage: Boolean = false,
+        engine: DocEngine = this.engine
+    ) {
         var fileType = fileType
         var docUrl = docUrl
         var docSourceType = docSourceType
@@ -184,7 +219,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
                 Log.d(TAG, "file = null")
             }
         }
-        Log.e(TAG,"openDoc()......fileType = $fileType")
+        Log.e(TAG, "openDoc()......fileType = $fileType")
         mActivity = activity
         mViewPdfInPage = viewPdfInPage
         if (docSourceType == DocSourceType.PATH) {
@@ -196,8 +231,9 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP
                 || engine == DocEngine.MICROSOFT
                 || engine == DocEngine.XDOC
-                || engine == DocEngine.GOOGLE) {
-                showByWeb(docUrl ?: "",engine)
+                || engine == DocEngine.GOOGLE
+            ) {
+                showByWeb(docUrl ?: "", engine)
                 return
             }
             downloadFile(docUrl ?: "")
@@ -210,44 +246,47 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         }
         when (type) {
             FileType.PDF -> {
-                Log.e(TAG,"openDoc()......PDF")
+                Log.e(TAG, "openDoc()......PDF")
                 mDocWeb.hide()
                 mFlDocContainer.hide()
                 mRvPdf.show()
                 mIvImage.hide()
 
-                showPdf(docSourceType,docUrl)
+                showPdf(docSourceType, docUrl)
             }
+
             FileType.IMAGE -> {
                 if (showPageNum) {
                     showPageNum = false
                 }
-                Log.e(TAG,"openDoc()......")
+                Log.e(TAG, "openDoc()......")
                 mDocWeb.hide()
                 mFlDocContainer.hide()
                 mRvPdf.hide()
                 mIvImage.show()
                 if (docSourceType == DocSourceType.PATH) {
-                    Log.e(TAG,"openDoc()......PATH")
+                    Log.e(TAG, "openDoc()......PATH")
                     mIvImage.load(File(docUrl))
                 } else {
-                    Log.e(TAG,"openDoc()......URL")
+                    Log.e(TAG, "openDoc()......URL")
                     mIvImage.load(docUrl)
                 }
             }
+
             FileType.NOT_SUPPORT -> {
                 if (showPageNum) {
                     showPageNum = false
                 }
-                Log.e(TAG,"openDoc()......NOT_SUPPORT")
+                Log.e(TAG, "openDoc()......NOT_SUPPORT")
                 mDocWeb.show()
                 mFlDocContainer.hide()
                 mRvPdf.hide()
                 mIvImage.hide()
-                showByWeb(docUrl ?: "",this.engine)
+                showByWeb(docUrl ?: "", this.engine)
             }
+
             else -> {
-                Log.e(TAG,"openDoc()......ELSE")
+                Log.e(TAG, "openDoc()......ELSE")
                 if (showPageNum) {
                     showPageNum = false
                 }
@@ -255,14 +294,20 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
                 mFlDocContainer.show()
                 mRvPdf.hide()
                 mIvImage.hide()
-                activity?.let { showDoc(it,mFlDocContainer,docUrl,docSourceType,fileType) }
+                activity?.let { showDoc(it, mFlDocContainer, docUrl, docSourceType, fileType) }
             }
         }
     }
 
-    fun showDoc(activity: Activity, mDocContainer: ViewGroup?, url: String?, docSourceType: Int, fileType: Int) {
-        Log.e(TAG,"showDoc()......")
-        var iOffice: IOffice = object: IOffice() {
+    fun showDoc(
+        activity: Activity,
+        mDocContainer: ViewGroup?,
+        url: String?,
+        docSourceType: Int,
+        fileType: Int
+    ) {
+        Log.e(TAG, "showDoc()......")
+        var iOffice: IOffice = object : IOffice() {
             override fun getActivity(): Activity {
                 return activity
             }
@@ -277,7 +322,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
                             RelativeLayout.LayoutParams.MATCH_PARENT
                         )
                     )
-                },200)
+                }, 200)
             }
 
             override fun openFileFailed() {
@@ -309,42 +354,46 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
             }
 
         }
-        iOffice.openFile(url,docSourceType, fileType.toString())
+        iOffice.openFile(url, docSourceType, fileType.toString())
     }
 
     fun showPdf(docSourceType: Int, url: String?) {
-        Log.e(TAG,"showPdf()......quality = $quality")
+        Log.e(TAG, "showPdf()......quality = $quality")
         when (docSourceType) {
             DocSourceType.URL -> {
-                Log.e(TAG,"showPdf()......URL")
+                Log.e(TAG, "showPdf()......URL")
                 initWithUrl(url = url ?: "", pdfQuality = quality)
             }
+
             DocSourceType.URI -> {
-                Log.e(TAG,"showPdf()......URI")
+                Log.e(TAG, "showPdf()......URI")
                 initWithUri(fileUri = url ?: "", pdfQuality = quality)
             }
+
             DocSourceType.PATH -> {
-                Log.e(TAG,"showPdf()......PATH")
+                Log.e(TAG, "showPdf()......PATH")
                 initWithPath(path = url ?: "", pdfQuality = quality)
             }
+
             DocSourceType.ASSETS -> {
-                Log.e(TAG,"showPdf()......ASSETS")
+                Log.e(TAG, "showPdf()......ASSETS")
                 initWithAssets(fileName = url ?: "", pdfQuality = quality)
             }
         }
     }
 
     private fun showPdf(file: File, pdfQuality: PdfQuality) {
-        Log.e(javaClass.simpleName,"initView-exists = ${file.exists()}")
-        Log.e(javaClass.simpleName,"initView-mViewPdfInPage = $mViewPdfInPage")
+        Log.e(javaClass.simpleName, "initView-exists = ${file.exists()}")
+        Log.e(javaClass.simpleName, "initView-mViewPdfInPage = $mViewPdfInPage")
         pdfRendererCore = PdfRendererCore(context, file, pdfQuality)
         totalPageCount = pdfRendererCore?.getPageCount() ?: 0
         pdfRendererCoreInitialised = true
-        pdfViewAdapter = PdfViewAdapter(pdfRendererCore, pageMargin, enableLoadingForPages,this)
+        pdfViewAdapter = PdfViewAdapter(pdfRendererCore, pageMargin, enableLoadingForPages, this)
         pdfPageViewAdapter = PdfPageViewAdapter(pdfRendererCore, pageMargin, enableLoadingForPages)
         mRvPdf.setEnableScale(true)
         if (mViewPdfInPage) {
-            mRvPdf.layoutManager = LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
+            mRvPdf.layoutManager =
+                LinearLayoutManager(context, LinearLayoutManager.HORIZONTAL, false)
             mRvPdf.adapter = pdfPageViewAdapter
             PagerSnapHelper().attachToRecyclerView(mRvPdf)
         } else {
@@ -387,7 +436,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
             throw UnsupportedOperationException("should be over API 21")
 
-        val file = FileUtils.fileFromAsset(context,fileName)
+        val file = FileUtils.fileFromAsset(context, fileName)
         showPdf(file, pdfQuality)
     }
 
@@ -395,17 +444,19 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP)
             throw UnsupportedOperationException("should be over API 21")
 
-        val file = FileUtils.fileFromUri(context,fileUri)
+        val file = FileUtils.fileFromUri(context, fileUri)
         showPdf(file, pdfQuality)
     }
 
-    fun downloadFile(url: String, pdfQuality: PdfQuality = this.quality,
-                     lifecycleScope: LifecycleCoroutineScope = (context as AppCompatActivity).lifecycleScope) {
+    fun downloadFile(
+        url: String, pdfQuality: PdfQuality = this.quality,
+        lifecycleScope: LifecycleCoroutineScope = (context as AppCompatActivity).lifecycleScope
+    ) {
         PdfDownloader(url, this)
     }
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun showByWeb(url: String,engine: DocEngine = this.engine) {
+    private fun showByWeb(url: String, engine: DocEngine = this.engine) {
         mDocWeb.mOnWebLoadListener = this
 
         var engineUrl = "engine"
@@ -413,12 +464,15 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
             DocEngine.MICROSOFT -> {
                 engineUrl = Constant.MICROSOFT_URL
             }
+
             DocEngine.XDOC -> {
                 engineUrl = Constant.XDOC_VIEW_URL
             }
+
             DocEngine.GOOGLE -> {
                 engineUrl = Constant.GOOGLE_URL
             }
+
             else -> {
                 engineUrl = Constant.XDOC_VIEW_URL
             }
@@ -429,7 +483,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
     override fun getDownloadContext() = context
 
     override fun onDownloadStart() {
-        Log.e(TAG,"initWithUrl-onDownloadStart()......")
+        Log.e(TAG, "initWithUrl-onDownloadStart()......")
     }
 
     override fun onDownloadProgress(currentBytes: Long, totalBytes: Long) {
@@ -437,20 +491,20 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         if (progress >= 100) {
             progress = 100
         }
-        Log.e(TAG,"initWithUrl-onDownloadProgress()......progress = $progress")
+        Log.e(TAG, "initWithUrl-onDownloadProgress()......progress = $progress")
         showLoadingProgress(progress)
     }
 
     override fun onDownloadSuccess(absolutePath: String) {
-        Log.e(TAG,"initWithUrl-onDownloadSuccess()......")
+        Log.e(TAG, "initWithUrl-onDownloadSuccess()......")
         showLoadingProgress(100)
         sourceFilePath = absolutePath
-        openDoc(mActivity, absolutePath, DocSourceType.PATH,-1,mViewPdfInPage)
+        openDoc(mActivity, absolutePath, DocSourceType.PATH, -1, mViewPdfInPage)
     }
 
     override fun onError(error: Throwable) {
         error.printStackTrace()
-        Log.e(TAG,"initWithUrl-onError()......${error.localizedMessage}")
+        Log.e(TAG, "initWithUrl-onError()......${error.localizedMessage}")
         showLoadingProgress(100)
     }
 
@@ -476,10 +530,14 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
             super.onScrolled(recyclerView, dx, dy)
             (recyclerView.layoutManager as LinearLayoutManager).run {
-                var foundPosition : Int = findLastCompletelyVisibleItemPosition()
+                var foundPosition: Int = findLastCompletelyVisibleItemPosition()
 
                 if (foundPosition != RecyclerView.NO_POSITION)
-                    mPdfPageNo.text = context.getString(R.string.pdfView_page_no,foundPosition + 1,totalPageCount)
+                    mPdfPageNo.text = context.getString(
+                        R.string.pdfView_page_no,
+                        foundPosition + 1,
+                        totalPageCount
+                    )
 
                 if (showPageNum) {
                     mPdfPageNo.visibility = View.VISIBLE
@@ -504,7 +562,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
 
         override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
             super.onScrollStateChanged(recyclerView, newState)
-            if (newState == RecyclerView.SCROLL_STATE_IDLE  && !mViewPdfInPage) {
+            if (newState == RecyclerView.SCROLL_STATE_IDLE && !mViewPdfInPage) {
                 mPdfPageNo.postDelayed(runnable, 3000)
             } else {
                 mPdfPageNo.removeCallbacks(runnable)
@@ -533,7 +591,7 @@ class DocView : FrameLayout,OnDownloadListener, OnWebLoadListener,OnPdfItemClick
         mLlBigPdfImage.show()
         mPbBigLoading.show()
         mIvPdf.setImageBitmap(null)
-        pdfRendererCore?.renderPage(position,PdfQuality.ENHANCED) { bitmap: Bitmap?, pageNo: Int ->
+        pdfRendererCore?.renderPage(position, PdfQuality.ENHANCED) { bitmap: Bitmap?, pageNo: Int ->
             mPbBigLoading.hide()
             mIvPdf.setImageBitmap(bitmap)
             mIvPdf.reset()

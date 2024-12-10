@@ -1,7 +1,7 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'kotlin-android-extensions'
+    // id 'kotlin-android-extensions'
 }
 
 android {
@@ -55,5 +55,18 @@ dependencies {
     implementation("io.coil-kt:coil:1.4.0")
 
     implementation 'com.github.Victor2018:easypermissions:v1.1.0'
+
+    // core
+    implementation 'com.liulishuo.okdownload:okdownload:1.0.7'
+    // provide sqlite to store breakpoints
+    implementation 'com.liulishuo.okdownload:sqlite:1.0.7'
+    // provide okhttp to connect to backend
+    // and then please import okhttp dependencies by yourself
+    implementation 'com.liulishuo.okdownload:okhttp:1.0.7'
+    // provide interface to match filedownloader
+    implementation 'com.liulishuo.okdownload:filedownloader:1.0.7'
+    // provide interface for kotlin extension
+    implementation 'com.liulishuo.okdownload:ktx:1.0.7'
+    implementation 'com.squareup.okhttp3:okhttp:3.10.0'
 
 }
