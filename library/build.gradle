@@ -64,7 +64,7 @@ def pubLocal() {
     def repoDir = file("../repo/com/github/Victor2018")
     if (!repoDir.exists()) {
         String[] temp = ["./gradlew.bat", ":library:publish"]
-        Runtime.runtime.exec(temp, null, file("../."))
+        Runtime.runtime.exec(temp, null, rootDir)
         println("create DocViewer succes.")
     } else {
         println("has created DocViewer")
@@ -77,14 +77,14 @@ afterEvaluate {
             release(MavenPublication) {
                 from components.release
                 groupId = 'com.github.Victor2018' //groupId 随便取
-                artifactId = 'cherry'  //artifactId 随便取
+                artifactId = 'MyDocViewer'  //artifactId 随便取
                 version = '1.0.0'
             }
         }
 
         repositories {
             maven {
-                name = 'DocViewer'
+                name = 'MyDocViewer'
                 // url = layout.buildDirectory.dir("repo")
                 url = "../repo"
             }

@@ -8,6 +8,9 @@ pluginManagement {
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
+        maven {
+            url uri(new File(rootDir, 'repo'))
+        }
         google()
         mavenCentral()
         maven { setUrl("https://jitpack.io") }
